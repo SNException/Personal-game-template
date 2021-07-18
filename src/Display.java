@@ -19,19 +19,30 @@ public final class Display {
     private final HashMap<RenderingHints.Key, Object> renderingHints;
     private final Graphics2D g;
 
+    private double xScale  = 1;
+    private double yScale  = 1;
+    private double xCenter = 0;
+    private double yCenter = 0;
+
+    private final int width;
+    private final int height;
+
     private enum DebugLevel {
         NONE,
         LIGHT,
         HEAVY;
     }
+
     private DebugLevel debug = DebugLevel.LIGHT;
 
     public Display(final Game game, final int width, final int height, final double hz) {
         assert game != null;
         assert width > 0 && height > 0 && hz > 0;
 
-        this.game = game;
-        this.hz   = hz;
+        this.width  = width;
+        this.height = height;
+        this.game   = game;
+        this.hz     = hz;
 
         create_frame: {
             canvas = new Canvas();
@@ -42,6 +53,7 @@ public final class Display {
 
             frame = new Frame("untitled");
             frame.addWindowListener(new CustomWindowAdapter());
+            frame.addComponentListener(new CustomComponentAdapter());
             frame.add(canvas);
 
             final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
@@ -151,9 +163,6 @@ public final class Display {
         input.update(); // must be the last call inside this function
     }
 
-    /*
-        TODO
-    */
     private void render() {
         // TODO(nschultz): reset graphics object for the game
 
@@ -171,18 +180,8 @@ public final class Display {
                 g.setColor(Color.BLACK);
                 g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
-                // maintain aspect ratio TODO(nschultz): Only calculate this on screen resize, use passed with and height parms instead of calling backBuffer.getWidth()/getHeight()
-                /*int xScale = canvas.getWidth()  / backBuffer.getWidth();
-                int yScale = canvas.getHeight() / backBuffer.getHeight();
-                if (xScale < 1) xScale = 1;
-                if (yScale < 1) yScale = 1;
-                if (xScale > yScale) xScale = yScale;
-                if (yScale > xScale) yScale = xScale;
-                final float xCenter = (canvas.getWidth()  - backBuffer.getWidth()  * xScale) / 2;
-                final float yCenter = (canvas.getHeight() - backBuffer.getHeight() * yScale) / 2;
-                g.drawImage(backBuffer, (int) xCenter, (int) yCenter, backBuffer.getWidth() * xScale, backBuffer.getHeight() * yScale, null);*/
-
-                g.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+                g.drawImage(backBuffer, (int) xCenter, (int) yCenter, (int) (width * xScale), (int) (height * yScale), null);
+                // g.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
 
                 if (debug != DebugLevel.NONE) {
                     renderDebugInfo(g);
@@ -200,8 +199,10 @@ public final class Display {
         } while (bufferStrategy.contentsLost());
     }
 
+    private final Font mainFont = new Font("SansSerif", Font.PLAIN, 24);
+
     public void renderDebugInfo(final Graphics2D g) {
-        g.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        g.setFont(mainFont);
 
         frame_time: {
             g.setColor(mainLoop.isLagging() ? Color.RED : Color.WHITE);
@@ -284,6 +285,22 @@ public final class Display {
                 Runtime.getRuntime().runFinalization();
             }
             System.exit(0);
+        }
+    }
+
+    private final class CustomComponentAdapter extends ComponentAdapter {
+
+        @Override
+        public void componentResized(final ComponentEvent evt) {
+            xScale = canvas.getWidth()  / backBuffer.getWidth();
+            yScale = canvas.getHeight() / backBuffer.getHeight();
+            if (xScale < 1) xScale = 1;
+            if (yScale < 1) yScale = 1;
+            if (xScale > yScale) xScale = yScale;
+            if (yScale > xScale) yScale = xScale;
+
+            xCenter = (canvas.getWidth()  - backBuffer.getWidth()  * xScale) / 2;
+            yCenter = (canvas.getHeight() - backBuffer.getHeight() * yScale) / 2;
         }
     }
 
