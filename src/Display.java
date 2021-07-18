@@ -66,7 +66,7 @@ public final class Display {
             backBuffer = gfxConfig.createCompatibleImage(width, height, Transparency.TRANSLUCENT);
             g = backBuffer.createGraphics();
 
-            canvas.createBufferStrategy(2); // two buffers are always supported
+            canvas.createBufferStrategy(2); // two buffers are always supported TODO(nschultz): Check if we can use 3
             bufferStrategy = canvas.getBufferStrategy();
         }
 
@@ -130,7 +130,12 @@ public final class Display {
         input.update(); // must be the last call inside this function
     }
 
+    /*
+        TODO
+    */
     private void render() {
+        // TODO(nschultz): reset graphics object for the game
+
         // render game code onto the backbuffer
         game.render(g);
 
@@ -140,11 +145,26 @@ public final class Display {
             do {
                 final Graphics2D g = (Graphics2D) bufferStrategy.getDrawGraphics();
                 g.setRenderingHints(renderingHints);
-                g.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+
+                // clear the canvas
+                g.setColor(Color.BLACK);
+                g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
+                // maintain aspect ratio TODO(nschultz): Only calculate this on screen resize, use passed with and height parms instead of calling backBuffer.getWidth()/getHeight()
+                int xScale = canvas.getWidth()  / backBuffer.getWidth();
+                int yScale = canvas.getHeight() / backBuffer.getHeight();
+                if (xScale < 1) xScale = 1;
+                if (yScale < 1) yScale = 1;
+                if (xScale > yScale) xScale = yScale;
+                if (yScale > xScale) yScale = xScale;
+                final float xCenter = (canvas.getWidth()  - backBuffer.getWidth()  * xScale) / 2;
+                final float yCenter = (canvas.getHeight() - backBuffer.getHeight() * yScale) / 2;
+                g.drawImage(backBuffer, (int) xCenter, (int) yCenter, backBuffer.getWidth() * xScale, backBuffer.getHeight() * yScale, null);
 
                 if (debug) {
                     renderDebugInfo(g);
                 }
+
                 g.dispose();
             } while (bufferStrategy.contentsRestored());
 
