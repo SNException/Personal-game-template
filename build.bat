@@ -10,7 +10,7 @@ SET RES_DIR=res
 SET DOC_DIR=doc
 SET LIBS_DIR=libs
 
-SET JVM_FLAGS=-ea -Xms16m -Xmx16m -XX:+AlwaysPreTouch -XX:+UseG1GC
+SET JVM_FLAGS=-ea -Xms8m -Xmx8m -XX:+AlwaysPreTouch -XX:+UseG1GC
 SET COMPILER_FLAGS=-Xlint:all -Xlint:deprecation -Xdiags:verbose -Xmaxerrs 3 -g -encoding UTF8
 SET ENTRY_POINT=Main
 SET EXE_NAME=Game

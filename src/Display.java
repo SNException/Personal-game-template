@@ -19,17 +19,34 @@ public final class Display {
     private final HashMap<RenderingHints.Key, Object> renderingHints;
     private final Graphics2D g;
 
-    private boolean debug = true;
+    private double xScale  = 1;
+    private double yScale  = 1;
+    private double xCenter = 0;
+    private double yCenter = 0;
+
+    private final int width;
+    private final int height;
+
+    private enum DebugLevel {
+        NONE,
+        LIGHT,
+        HEAVY;
+    }
+
+    private DebugLevel debug = DebugLevel.LIGHT;
 
     public Display(final Game game, final int width, final int height, final double hz) {
         assert game != null;
         assert width > 0 && height > 0 && hz > 0;
 
-        this.game = game;
-        this.hz   = hz;
+        this.width  = width;
+        this.height = height;
+        this.game   = game;
+        this.hz     = hz;
 
         create_frame: {
             canvas = new Canvas();
+            canvas.setSize(width * 4, height * 4); // TODO(nschultz): Clamp according to screen resolution
             input = new InputHandler();
             canvas.addKeyListener(input);
             canvas.setIgnoreRepaint(true);
@@ -37,10 +54,10 @@ public final class Display {
 
             frame = new Frame("untitled");
             frame.addWindowListener(new CustomWindowAdapter());
+            frame.addComponentListener(new CustomComponentAdapter());
             frame.add(canvas);
+            frame.pack();
 
-            final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-            frame.setSize(screenSize.width / 2, screenSize.height / 2);
             frame.setLocationRelativeTo(null);
 
             frame.setVisible(true);
@@ -66,7 +83,7 @@ public final class Display {
             backBuffer = gfxConfig.createCompatibleImage(width, height, Transparency.TRANSLUCENT);
             g = backBuffer.createGraphics();
 
-            canvas.createBufferStrategy(2); // two buffers are always supported
+            canvas.createBufferStrategy(2); // two buffers are always supported TODO(nschultz): Check if we can use 3
             bufferStrategy = canvas.getBufferStrategy();
         }
 
@@ -101,14 +118,17 @@ public final class Display {
         }
     }
 
-    private void update() {
+    private void input() {
+        game.input(input);
+
         if (input.isKeyUp(KeyEvent.VK_F11)) {
             final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
             if (frame.isUndecorated()) {
                 // windowed
                 frame.dispose();
                 frame.setUndecorated(false);
-                frame.setSize(screenSize.width / 2, screenSize.height / 2);
+                canvas.setSize(width * 4, height * 4); // TODO(nschultz): Clamp according to screen resolution
+                frame.pack();
                 frame.setLocationRelativeTo(null);
                 frame.setCursor(Cursor.getDefaultCursor());
                 frame.setVisible(true);
@@ -122,15 +142,35 @@ public final class Display {
                 frame.setVisible(true);
             }
         } else if (input.isKeyUp(KeyEvent.VK_F12)) {
-            debug = !debug;
-        }
+            switch (debug) {
+                case NONE: {
+                    debug = DebugLevel.LIGHT;
+                } break;
 
-        game.update(input);
+                case LIGHT: {
+                    debug = DebugLevel.HEAVY;
+                } break;
+
+                case HEAVY: {
+                    debug = DebugLevel.NONE;
+                } break;
+
+                default: {
+                    assert false;
+                }
+            }
+        }
+    }
+
+    private void update() {
+        game.update();
 
         input.update(); // must be the last call inside this function
     }
 
     private void render() {
+        // TODO(nschultz): reset graphics object for the game
+
         // render game code onto the backbuffer
         game.render(g);
 
@@ -140,11 +180,18 @@ public final class Display {
             do {
                 final Graphics2D g = (Graphics2D) bufferStrategy.getDrawGraphics();
                 g.setRenderingHints(renderingHints);
-                g.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
 
-                if (debug) {
+                // clear the canvas
+                g.setColor(Color.BLACK);
+                g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
+
+                g.drawImage(backBuffer, (int) xCenter, (int) yCenter, (int) (width * xScale), (int) (height * yScale), null);
+                // g.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
+
+                if (debug != DebugLevel.NONE) {
                     renderDebugInfo(g);
                 }
+
                 g.dispose();
             } while (bufferStrategy.contentsRestored());
 
@@ -157,8 +204,10 @@ public final class Display {
         } while (bufferStrategy.contentsLost());
     }
 
+    private final Font mainFont = new Font("SansSerif", Font.PLAIN, 24);
+
     public void renderDebugInfo(final Graphics2D g) {
-        g.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        g.setFont(mainFont);
 
         frame_time: {
             g.setColor(mainLoop.isLagging() ? Color.RED : Color.WHITE);
@@ -166,6 +215,8 @@ public final class Display {
             final int sw = g.getFontMetrics().stringWidth(frameTimeStr);
             g.drawString(frameTimeStr, canvas.getWidth() - (sw + 24), 32);
         }
+
+        if (debug != DebugLevel.HEAVY) return;
 
         memory: {
             // this approach of calculating only works when we set the 'Xms' and 'Xmx' to the same value
@@ -242,6 +293,22 @@ public final class Display {
         }
     }
 
+    private final class CustomComponentAdapter extends ComponentAdapter {
+
+        @Override
+        public void componentResized(final ComponentEvent evt) {
+            xScale = canvas.getWidth()  / backBuffer.getWidth();
+            yScale = canvas.getHeight() / backBuffer.getHeight();
+            if (xScale < 1) xScale = 1;
+            if (yScale < 1) yScale = 1;
+            if (xScale > yScale) xScale = yScale;
+            if (yScale > xScale) yScale = xScale;
+
+            xCenter = (canvas.getWidth()  - backBuffer.getWidth()  * xScale) / 2;
+            yCenter = (canvas.getHeight() - backBuffer.getHeight() * yScale) / 2;
+        }
+    }
+
     private final class MainLoop implements Runnable {
 
         public volatile boolean running = false;
@@ -263,6 +330,7 @@ public final class Display {
 
                 try {
                     EventQueue.invokeAndWait(() -> {
+                        input();
                         update();
                         render();
                         totalFramesRendered += 1;
