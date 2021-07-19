@@ -46,6 +46,7 @@ public final class Display {
 
         create_frame: {
             canvas = new Canvas();
+            canvas.setSize(width * 4, height * 4); // TODO(nschultz): Clamp according to screen resolution
             input = new InputHandler();
             canvas.addKeyListener(input);
             canvas.setIgnoreRepaint(true);
@@ -55,9 +56,8 @@ public final class Display {
             frame.addWindowListener(new CustomWindowAdapter());
             frame.addComponentListener(new CustomComponentAdapter());
             frame.add(canvas);
+            frame.pack();
 
-            final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-            frame.setSize(screenSize.width / 2, screenSize.height / 2);
             frame.setLocationRelativeTo(null);
 
             frame.setVisible(true);
@@ -118,14 +118,17 @@ public final class Display {
         }
     }
 
-    private void update() {
+    private void input() {
+        game.input(input);
+
         if (input.isKeyUp(KeyEvent.VK_F11)) {
             final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
             if (frame.isUndecorated()) {
                 // windowed
                 frame.dispose();
                 frame.setUndecorated(false);
-                frame.setSize(screenSize.width / 2, screenSize.height / 2);
+                canvas.setSize(width * 4, height * 4); // TODO(nschultz): Clamp according to screen resolution
+                frame.pack();
                 frame.setLocationRelativeTo(null);
                 frame.setCursor(Cursor.getDefaultCursor());
                 frame.setVisible(true);
@@ -157,8 +160,10 @@ public final class Display {
                 }
             }
         }
+    }
 
-        game.update(input);
+    private void update() {
+        game.update();
 
         input.update(); // must be the last call inside this function
     }
@@ -325,6 +330,7 @@ public final class Display {
 
                 try {
                     EventQueue.invokeAndWait(() -> {
+                        input();
                         update();
                         render();
                         totalFramesRendered += 1;
