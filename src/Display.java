@@ -187,7 +187,6 @@ public final class Display {
                 g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
                 g.drawImage(backBuffer, (int) xCenter, (int) yCenter, (int) (width * xScale), (int) (height * yScale), null);
-                // g.drawImage(backBuffer, 0, 0, canvas.getWidth(), canvas.getHeight(), null);
 
                 if (debug != DebugLevel.NONE) {
                     renderDebugInfo(g);
@@ -212,7 +211,7 @@ public final class Display {
 
         frame_time: {
             g.setColor(mainLoop.isLagging() ? Color.RED : Color.WHITE);
-            final String frameTimeStr =  String.format("%.3f/%.3f ms", mainLoop.rawFrameTimeMillis, mainLoop.cookedFrameTimeMillis);
+            final String frameTimeStr =  String.format("%.3f/%.3f ms (time)", mainLoop.rawFrameTimeMillis, mainLoop.cookedFrameTimeMillis);
             final int sw = g.getFontMetrics().stringWidth(frameTimeStr);
             g.drawString(frameTimeStr, canvas.getWidth() - (sw + 24), 32);
         }
@@ -224,7 +223,7 @@ public final class Display {
             final double maxHeapMemoryMb  = (double) Runtime.getRuntime().maxMemory()  / Math.pow(1024.0d, 2.0d);
             final double usedHeapMemoryMb = maxHeapMemoryMb - ((double) Runtime.getRuntime().freeMemory() / Math.pow(1024.0d, 2.0d));
 
-            final String memStr =  String.format("%.1f/%.1f mb", usedHeapMemoryMb, maxHeapMemoryMb);
+            final String memStr =  String.format("%.1f/%.1f mb (heap)", usedHeapMemoryMb, maxHeapMemoryMb);
             final int sw = g.getFontMetrics().stringWidth(memStr);
             g.setColor(Color.WHITE);
             g.drawString(memStr, canvas.getWidth() - (sw + 24), 64);
@@ -233,7 +232,7 @@ public final class Display {
         jit_info: {
             final CompilationMXBean jitBean = ManagementFactory.getCompilationMXBean();
             if (jitBean.isCompilationTimeMonitoringSupported()) {
-                final String jitStr =  String.format("%s ms", jitBean.getTotalCompilationTime());
+                final String jitStr =  String.format("%s ms (jit)", jitBean.getTotalCompilationTime());
                 final int sw = g.getFontMetrics().stringWidth(jitStr);
                 g.setColor(Color.WHITE);
                 g.drawString(jitStr, canvas.getWidth() - (sw + 24), 96);
@@ -253,7 +252,7 @@ public final class Display {
                 gcTotalTime  += gcTime;
                 gcTotalCount += gcCount;
             }
-            final String gcStr = String.format("%s (%s) ms", gcTotalTime, gcTotalCount);
+            final String gcStr = String.format("%s/%s ms/cnt (gc)", gcTotalTime, gcTotalCount);
             final int sw = g.getFontMetrics().stringWidth(gcStr);
             g.setColor(Color.WHITE);
             g.drawString(gcStr, canvas.getWidth() - (sw + 24), 128);
@@ -261,14 +260,14 @@ public final class Display {
 
         frame_count: {
             g.setColor(Color.WHITE);
-            final String frameCountStr = mainLoop.totalFramesRendered + " frames";
+            final String frameCountStr = mainLoop.totalFramesRendered + " (frames)";
             final int sw = g.getFontMetrics().stringWidth(frameCountStr);
             g.drawString(frameCountStr, canvas.getWidth() - (sw + 24), 160);
         }
 
         thread_count: {
             g.setColor(Color.WHITE);
-            final String threadStr = Thread.activeCount() + " threads";
+            final String threadStr = Thread.activeCount() + " (threads)";
             final int sw = g.getFontMetrics().stringWidth(threadStr);
             g.drawString(threadStr, canvas.getWidth() - (sw + 24), 192);
         }
@@ -285,19 +284,21 @@ public final class Display {
         }
     }
 
+    public void free() {
+        game.destroy();
+        mainLoop.running = false;
+        g.dispose();
+        frame.dispose();
+        Runtime.getRuntime().gc();
+        Runtime.getRuntime().runFinalization();
+        System.exit(0);
+    }
+
     private final class CustomWindowAdapter extends WindowAdapter {
 
         @Override
         public void windowClosing(final WindowEvent evt) {
-            cleanup: {
-                game.destroy();
-                mainLoop.running = false;
-                g.dispose();
-                ((Frame) evt.getSource()).dispose();
-                Runtime.getRuntime().gc();
-                Runtime.getRuntime().runFinalization();
-            }
-            System.exit(0);
+            free();
         }
     }
 

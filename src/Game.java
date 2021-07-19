@@ -4,9 +4,12 @@ import java.awt.image.*;
 import java.io.*;
 import java.util.*;
 import javax.imageio.*;
+import javax.sound.sampled.*;
 
 // TODO(nschultz): How about that Game.java has multiple class instances available (e.g TileHandler, ImageHandler ... etc)
 public final class Game {
+
+    private final Display display;
 
     // 4:3
     public static final int WIDTH  = 320;
@@ -21,13 +24,27 @@ public final class Game {
     private HashMap<RenderingHints.Key, Object> renderingHints = null;
     private HashMap<String, Image> imageCache = null;
 
+    private Font mainFont = null;
     private ArrayList<Entity> entities = null;
     private Player player = null;
     private Camera camera = null;
 
+    public enum State {
+        MENU,
+        OVER_WORLD;
+    }
+
+    private State state = State.MENU;
+
+    private int selectedMenuItem = 0;
+    private String[] menuItems = new String[] {
+        "Start",
+        "Exit"
+    };
+
     public Game() {
         assert EventQueue.isDispatchThread();
-        new Display(this, WIDTH, HEIGHT, 60.0d);
+        display = new Display(this, WIDTH, HEIGHT, 60.0d);
     }
 
     public void init() {
@@ -42,6 +59,7 @@ public final class Game {
         renderingHints.put(RenderingHints.KEY_STROKE_CONTROL,      RenderingHints.VALUE_STROKE_PURE);
         renderingHints.put(RenderingHints.KEY_TEXT_ANTIALIASING,   RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 
+        mainFont = new Font("Monospaced", Font.PLAIN, 14);
         imageCache = new HashMap<>();
 
         loadOverworld();
@@ -175,56 +193,173 @@ public final class Game {
     public void destroy() {
     }
 
-
     public void input(final Display.InputHandler input) {
-        for (final Entity e : entities) {
-            if (!camera.isInsideViewPort(e)) {
-                continue;
-            }
-            e.input(input);
+        switch (state) {
+            case MENU: {
+                if (input.isKeyDown(KeyEvent.VK_SPACE)) {
+                    if (selectedMenuItem == 0) {
+                        state = State.OVER_WORLD;
+                    } else {
+                        display.free();
+                    }
+                }
+
+                if (input.isKeyDown(KeyEvent.VK_W)) {
+                    playSoundFile("res/select.wav", -10f, false);
+                    selectedMenuItem = 0;
+                }
+
+                if (input.isKeyDown(KeyEvent.VK_S)) {
+                    playSoundFile("res/select.wav", -10f, false);
+                    selectedMenuItem = 1;
+                }
+            } break;
+
+            case OVER_WORLD: {
+                for (final Entity e : entities) {
+                    if (!camera.isInsideViewPort(e)) {
+                        continue;
+                    }
+                    e.input(input);
+                }
+                player.input(input);
+            } break;
+
+            default: {
+                assert false : state.name() + " has not been implemented!";
+            } break;
         }
-        player.input(input);
     }
 
     public void update() {
-        for (final Entity e : entities) {
-            if (!camera.isInsideViewPort(e)) {
-                continue;
-            }
-            e.update();
+        switch (state) {
+            case MENU: {
+            } break;
+
+            case OVER_WORLD: {
+                for (final Entity e : entities) {
+                    if (!camera.isInsideViewPort(e)) {
+                        continue;
+                    }
+                    e.update();
+                }
+                player.update();
+                camera.centerOnEntity(player);
+            } break;
+
+            default: {
+                assert false : state.name() + " has not been implemented!";
+            } break;
         }
-        player.update();
-        camera.centerOnEntity(player);
     }
 
     public void render(final Graphics2D g) {
         g.setRenderingHints(renderingHints);
 
-        g.setColor(new Color(10, 50, 10));
-        g.fillRect(0, 0, WIDTH, HEIGHT);
+        switch (state) {
+            case MENU: {
+                g.setColor(new Color(0, 0, 0));
+                g.fillRect(0, 0, WIDTH, HEIGHT);
 
-        g.translate(-camera.xCam, -camera.yCam);
-        for (final Entity e : entities) {
-            if (!camera.isInsideViewPort(e)) {
-                continue;
-            }
-            e.render(g);
+                g.setColor(Color.WHITE);
+                g.setFont(mainFont.deriveFont((float) 32));
+                final String str = "untitled";
+                final Dimension dim = calcStringSize(g, str);
+
+                g.drawString(str, (WIDTH / 2) - (dim.width / 2), (HEIGHT / 2) - (dim.height / 2));
+
+                g.setColor(Color.WHITE);
+                g.setFont(mainFont.deriveFont((float) 18));
+                final int len = menuItems.length;
+                for (int i = 0; i < len; ++i) {
+                    String item = menuItems[i];
+                    if (selectedMenuItem == i) {
+                        item = "> " + item + " <";
+                    }
+                    final Dimension itemDim = calcStringSize(g, item);
+                    g.drawString(item, (WIDTH / 2) - (itemDim.width / 2), ((HEIGHT / 2) - (itemDim.height / 2)) + ((i + 1) * 32));
+                }
+            } break;
+
+            case OVER_WORLD: {
+                g.setColor(new Color(10, 50, 10));
+                g.fillRect(0, 0, WIDTH, HEIGHT);
+
+                g.translate(-camera.xCam, -camera.yCam);
+                for (final Entity e : entities) {
+                    if (!camera.isInsideViewPort(e)) {
+                        continue;
+                    }
+                    e.render(g);
+                }
+                player.render(g);
+                g.translate(camera.xCam, camera.yCam);
+            } break;
+
+            default: {
+                assert false : state.name() + " has not been implemented!";
+            } break;
         }
-        player.render(g);
-        g.translate(camera.xCam, camera.yCam);
 
-        // renderTextBox(g, new Font("SansSerif", Font.PLAIN, 14), Color.WHITE, "Hi my name is FooBar. I am the one who will rescue the queen and end all suffering!", new Rectangle(50, 50, 200, 50));
+        // renderTextBox(g, mainFont, Color.WHITE, "HP: 20", new Rectangle(16, 16, 48, 20), Color.BLACK);
+        // final Rectangle centerBox = new Rectangle((WIDTH / 2) - (100 / 2), (HEIGHT / 2) - (100 / 2), 100, 20);
+        // renderTextBox(g, mainFont, Color.WHITE, "> Dark forrest <", centerBox, Color.BLACK);
     }
 
-    public void renderTextBox(final Graphics2D g, final Font font, final Color color, final String str, final Rectangle rect) {
+    // TODO(nschultz): I am loading this file over and over and over again.
+    // I need to put it into memory ONCE and then play it.
+    public void playSoundFile(final String file, final float decibel, final boolean loop) {
+        assert file != null;
+
+        try {
+            final Clip clip = (Clip) AudioSystem.getLine(new Line.Info(Clip.class));
+            clip.addLineListener(new LineListener() {
+                @Override
+                public void update(final LineEvent event) {
+                    if (event.getType() == LineEvent.Type.STOP) {
+                        clip.close();
+                    }
+                }
+            });
+
+            clip.open(AudioSystem.getAudioInputStream(new File(file)));
+            clip.setFramePosition(0);
+            if (loop) {
+                clip.loop(Clip.LOOP_CONTINUOUSLY);
+            }
+
+            final FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+            gainControl.setValue(decibel);
+            clip.start();
+        } catch (final Exception ex) {
+            ex.printStackTrace(System.err); // TODO(nschultz): Improve
+        }
+    }
+
+    private Dimension calcStringSize(final Graphics2D g, final String str) {
+        assert g   != null;
+        assert str != null;
+
+        final int strWidth = g.getFontMetrics().stringWidth(str);
+        final int strHeight = g.getFontMetrics().getAscent();
+
+        return new Dimension(strWidth, strHeight);
+    }
+
+    public void renderTextBox(final Graphics2D g, final Font font, final Color fg, final String str, final Rectangle rect, final Color bg) {
         assert g     != null;
         assert font  != null;
-        assert color != null;
+        assert fg    != null;
         assert str   != null;
         assert rect  != null;
 
+        if (bg != null) {
+            g.setColor(bg);
+            g.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 4, 4);
+        }
+
         g.setFont(font);
-        g.setColor(color);
+        g.setColor(fg);
 
         final String[] words = str.split(" ");
         final StringBuilder sbuffer = new StringBuilder(str.length());

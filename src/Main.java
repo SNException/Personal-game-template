@@ -11,6 +11,9 @@ public final class Main {
     }
 
     public static void main(final String[] args) {
+        // enable hardware accl
+        // System.setProperty("sun.java2d.opengl", "True");
+
         EventQueue.invokeLater(() -> {
             new Game();
         });
