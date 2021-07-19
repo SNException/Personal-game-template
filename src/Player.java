@@ -3,7 +3,10 @@ import java.awt.event.*;
 
 public final class Player extends Entity {
 
-    private final Image image;
+    private final Image frontImage;
+    private final Image frontImage2;
+    private final Image backImage;
+    private Image currentImage;
 
     private boolean moveUp    = false;
     private boolean moveDown  = false;
@@ -15,7 +18,10 @@ public final class Player extends Entity {
     public Player(final Game game, final Vector2f v2) {
         super(game, v2, Game.TILE_SIZE, Game.TILE_SIZE);
 
-        image = game.fetchImage("res/player.png");
+        frontImage   = game.fetchImage("res/player.png");
+        frontImage2  = game.fetchImage("res/player_2.png");
+        backImage    = game.fetchImage("res/player_back.png");
+        currentImage = frontImage;
     }
 
     @Override
@@ -23,25 +29,37 @@ public final class Player extends Entity {
         if (moveUp | moveDown | moveLeft | moveRight) return;
 
         if (input.isKeyPressed(KeyEvent.VK_W)) {
-            moveUp = true;
-            doneMoving = true;
-            movementRemaining = Game.TILE_SIZE;
-            // game.playSoundFile("res/walk.wav", -10, false);
+            currentImage = backImage;
+            if (game.canMoveToTile(this, Game.Dir.NORTH)) {
+                moveUp = true;
+                doneMoving = true;
+                movementRemaining = Game.TILE_SIZE;
+                // game.playSoundFile("res/walk.wav", -10, false);
+            }
         } else if (input.isKeyPressed(KeyEvent.VK_S)) {
-            moveDown = true;
-            doneMoving = true;
-            movementRemaining = Game.TILE_SIZE;
-            // game.playSoundFile("res/walk.wav", -10, false);
+            currentImage = frontImage;
+            if (game.canMoveToTile(this, Game.Dir.SOUTH)) {
+                moveDown = true;
+                doneMoving = true;
+                movementRemaining = Game.TILE_SIZE;
+                // game.playSoundFile("res/walk.wav", -10, false);
+            }
         } else if (input.isKeyPressed(KeyEvent.VK_A)) {
-            moveLeft = true;
-            doneMoving = true;
-            movementRemaining = Game.TILE_SIZE;
-            // game.playSoundFile("res/walk.wav", -10, false);
+            currentImage = frontImage2;
+            if (game.canMoveToTile(this, Game.Dir.WEST)) {
+                moveLeft = true;
+                doneMoving = true;
+                movementRemaining = Game.TILE_SIZE;
+                // game.playSoundFile("res/walk.wav", -10, false);
+            }
         } else if (input.isKeyPressed(KeyEvent.VK_D)) {
-            moveRight = true;
-            doneMoving = true;
-            movementRemaining = Game.TILE_SIZE;
-            // game.playSoundFile("res/walk.wav", -10, false);
+            currentImage = frontImage;
+            if (game.canMoveToTile(this, Game.Dir.EAST)) {
+                moveRight = true;
+                doneMoving = true;
+                movementRemaining = Game.TILE_SIZE;
+                // game.playSoundFile("res/walk.wav", -10, false);
+            }
         }
     }
 
@@ -89,6 +107,6 @@ public final class Player extends Entity {
 
     @Override
     public void render(final Graphics2D g) {
-        g.drawImage(image, (int) v2.x, (int) v2.y, w, h, null);
+        g.drawImage(currentImage, (int) v2.x, (int) v2.y, w, h, null);
     }
 }

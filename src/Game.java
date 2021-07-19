@@ -5,6 +5,7 @@ import java.io.*;
 import java.util.*;
 import javax.imageio.*;
 
+// TODO(nschultz): How about that Game.java has multiple class instances available (e.g TileHandler, ImageHandler ... etc)
 public final class Game {
 
     // 4:3
@@ -44,13 +45,16 @@ public final class Game {
         imageCache = new HashMap<>();
 
         loadOverworld();
+
+        Runtime.getRuntime().gc();
+        Runtime.getRuntime().runFinalization();
     }
 
     // TODO(nschultz): Way later, we need our own build-in editor.
     private void loadOverworld() {
         final BufferedImage image = (BufferedImage) fetchImage("res/overworld.png");
 
-        camera = new Camera(image.getWidth() * Game.TILE_SIZE, image.getHeight() * Game.TILE_SIZE);
+        camera = new Camera(image.getWidth() * TILE_SIZE, image.getHeight() * TILE_SIZE);
         if (entities != null) entities.clear();
         entities = new ArrayList<>(image.getWidth() * image.getHeight());
 
@@ -68,20 +72,25 @@ public final class Game {
                 // Evaluate the pixels colors and populate the world accordingly!
                 if (r == 255 && g == 0 && b == 0) {
                     // add grasstile under the player, so we do not leave a hole
-                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png")));
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png"), true));
 
                     player = new Player(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE));
                 } else if (r == 0 && g == 127 && b == 14) {
-                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png")));
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png"), true));
                 } else if (r == 0 && g == 38 && b == 255) {
-                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/water.png")));
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/water.png"), false));
                 } else if (r == 62 && g == 86 && b == 0) {
                     // add grasstile under the tree, so we do not leave a hole
-                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png")));
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png"), false));
 
-                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/tree.png")));
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/tree.png"), false));
+                } else if (r == 96 && g == 80 && b == 0) {
+                    // add mountaintile under the tree, so we do not leave a hole
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/grass.png"), false));
+
+                    entities.add(new SimpleTile(this, new Vector2f(x * Game.TILE_SIZE, y * Game.TILE_SIZE), fetchImage("res/mountain.png"), false));
                 } else {
-                    System.err.printf("Uknown tile value %s\n", color.toString());
+                    assert false : String.format("Uknown tile value %s\n", color.toString());
                 }
             }
         }
@@ -107,6 +116,60 @@ public final class Game {
 
         assert false;
         return null;
+    }
+
+    public enum Dir {
+        NORTH,
+        SOUTH,
+        WEST,
+        EAST;
+    }
+
+    public Entity getNextTileFrom(final Entity src, final Dir dir) {
+        assert src != null;
+        assert dir != null;
+
+        for (final Entity e : entities) {
+            switch (dir) {
+                case NORTH: {
+                    if (e.v2.x == src.v2.x && e.v2.y == (src.v2.y - TILE_SIZE)) {
+                        return e;
+                    }
+                } break;
+
+                case SOUTH: {
+                    if (e.v2.x == src.v2.x && e.v2.y == (src.v2.y + TILE_SIZE)) {
+                        return e;
+                    }
+                } break;
+
+                case WEST: {
+                    if (e.v2.x  == (src.v2.x - TILE_SIZE) && e.v2.y == src.v2.y) {
+                        return e;
+                    }
+                } break;
+
+                case EAST: {
+                    if (e.v2.x == (src.v2.x + TILE_SIZE) && e.v2.y == src.v2.y) {
+                        return e;
+                    }
+                } break;
+
+                default: {
+                    assert false : "Unknown Dir!";
+                } break;
+            }
+        }
+
+        return null;
+    }
+
+    public boolean canMoveToTile(final Entity src, final Dir dir) {
+        assert src != null;
+        assert dir != null;
+
+        final Entity e = getNextTileFrom(src, dir);
+        return e != null && e.passable;
     }
 
     public void destroy() {

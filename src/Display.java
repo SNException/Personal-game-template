@@ -29,11 +29,11 @@ public final class Display {
 
     private enum DebugLevel {
         NONE,
-        LIGHT,
-        HEAVY;
+        MINIMAL,
+        EXTENDED;
     }
 
-    private DebugLevel debug = DebugLevel.LIGHT;
+    private DebugLevel debug = DebugLevel.EXTENDED;
 
     public Display(final Game game, final int width, final int height, final double hz) {
         assert game != null;
@@ -46,18 +46,19 @@ public final class Display {
 
         create_frame: {
             canvas = new Canvas();
-            canvas.setSize(width * 4, height * 4); // TODO(nschultz): Clamp according to screen resolution
+            canvas.setSize(width * 6, height * 4); // TODO(nschultz): Clamp according to screen resolution
             input = new InputHandler();
             canvas.addKeyListener(input);
             canvas.setIgnoreRepaint(true);
             canvas.setFocusable(true);
 
-            frame = new Frame("untitled");
+            frame = new Frame("untitled game");
+            final var icon = new javax.swing.ImageIcon(new javax.swing.ImageIcon("res/player.png").getImage().getScaledInstance(32, 32, Image.SCALE_DEFAULT));
+            frame.setIconImage(icon.getImage());
             frame.addWindowListener(new CustomWindowAdapter());
             frame.addComponentListener(new CustomComponentAdapter());
             frame.add(canvas);
             frame.pack();
-
             frame.setLocationRelativeTo(null);
 
             frame.setVisible(true);
@@ -127,7 +128,7 @@ public final class Display {
                 // windowed
                 frame.dispose();
                 frame.setUndecorated(false);
-                canvas.setSize(width * 4, height * 4); // TODO(nschultz): Clamp according to screen resolution
+                canvas.setSize(width * 6, height * 4); // TODO(nschultz): Clamp according to screen resolution
                 frame.pack();
                 frame.setLocationRelativeTo(null);
                 frame.setCursor(Cursor.getDefaultCursor());
@@ -144,14 +145,14 @@ public final class Display {
         } else if (input.isKeyUp(KeyEvent.VK_F12)) {
             switch (debug) {
                 case NONE: {
-                    debug = DebugLevel.LIGHT;
+                    debug = DebugLevel.MINIMAL;
                 } break;
 
-                case LIGHT: {
-                    debug = DebugLevel.HEAVY;
+                case MINIMAL: {
+                    debug = DebugLevel.EXTENDED;
                 } break;
 
-                case HEAVY: {
+                case EXTENDED: {
                     debug = DebugLevel.NONE;
                 } break;
 
@@ -216,7 +217,7 @@ public final class Display {
             g.drawString(frameTimeStr, canvas.getWidth() - (sw + 24), 32);
         }
 
-        if (debug != DebugLevel.HEAVY) return;
+        if (debug != DebugLevel.EXTENDED) return;
 
         memory: {
             // this approach of calculating only works when we set the 'Xms' and 'Xmx' to the same value
@@ -263,6 +264,13 @@ public final class Display {
             final String frameCountStr = mainLoop.totalFramesRendered + " frames";
             final int sw = g.getFontMetrics().stringWidth(frameCountStr);
             g.drawString(frameCountStr, canvas.getWidth() - (sw + 24), 160);
+        }
+
+        thread_count: {
+            g.setColor(Color.WHITE);
+            final String threadStr = Thread.activeCount() + " threads";
+            final int sw = g.getFontMetrics().stringWidth(threadStr);
+            g.drawString(threadStr, canvas.getWidth() - (sw + 24), 192);
         }
     }
 
