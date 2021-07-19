@@ -29,12 +29,23 @@ public final class Game {
     private Player player = null;
     private Camera camera = null;
 
+    private boolean isSwitchingState = false;
+    private float transitionBoxW = 0;
+    private float transitionBoxH = 0;
+
     public enum State {
-        MENU,
-        OVER_WORLD;
+        MENU(0),
+        OVER_WORLD(1);
+        // TRANSITION; what is the state we transition into?
+
+        public final int value;
+        State(final int value) {
+            this.value = value;
+        }
     }
 
     private State state = State.MENU;
+    private ArrayList<GameState> states = null;;
 
     private int selectedMenuItem = 0;
     private String[] menuItems = new String[] {
@@ -59,10 +70,17 @@ public final class Game {
         renderingHints.put(RenderingHints.KEY_STROKE_CONTROL,      RenderingHints.VALUE_STROKE_PURE);
         renderingHints.put(RenderingHints.KEY_TEXT_ANTIALIASING,   RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 
-        mainFont = new Font("Monospaced", Font.PLAIN, 14);
+        mainFont = new Font("Monospaced", Font.BOLD, 14);
         imageCache = new HashMap<>();
 
         loadOverworld();
+
+        states = new ArrayList<>(2);
+        states.add(new MenuState());
+        states.add(new OverWorldState());
+
+        // TODO(nschultz): Play this when it is less obnoxious!
+        // playSoundFile("res/retro_bg.wav", 0, true);
 
         Runtime.getRuntime().gc();
         Runtime.getRuntime().runFinalization();
@@ -193,117 +211,54 @@ public final class Game {
     public void destroy() {
     }
 
-    public void input(final Display.InputHandler input) {
-        switch (state) {
-            case MENU: {
-                if (input.isKeyDown(KeyEvent.VK_SPACE)) {
-                    if (selectedMenuItem == 0) {
-                        state = State.OVER_WORLD;
-                    } else {
-                        display.free();
-                    }
-                }
+    public void onNextFrame(final Graphics2D g, final Display.InputHandler input) {
+        assert g     != null;
+        assert input != null;
 
-                if (input.isKeyDown(KeyEvent.VK_W)) {
-                    playSoundFile("res/select.wav", -10f, false);
-                    selectedMenuItem = 0;
-                }
-
-                if (input.isKeyDown(KeyEvent.VK_S)) {
-                    playSoundFile("res/select.wav", -10f, false);
-                    selectedMenuItem = 1;
-                }
-            } break;
-
-            case OVER_WORLD: {
-                for (final Entity e : entities) {
-                    if (!camera.isInsideViewPort(e)) {
-                        continue;
-                    }
-                    e.input(input);
-                }
-                player.input(input);
-            } break;
-
-            default: {
-                assert false : state.name() + " has not been implemented!";
-            } break;
-        }
+        processInput(input);
+        update();
+        render(g);
     }
 
-    public void update() {
-        switch (state) {
-            case MENU: {
-            } break;
+    private void switchState(final State newState) {
+        assert newState != null;
 
-            case OVER_WORLD: {
-                for (final Entity e : entities) {
-                    if (!camera.isInsideViewPort(e)) {
-                        continue;
-                    }
-                    e.update();
-                }
-                player.update();
-                camera.centerOnEntity(player);
-            } break;
+        isSwitchingState = true;
+        transitionBoxW = 0;
+        transitionBoxH = 0;
 
-            default: {
-                assert false : state.name() + " has not been implemented!";
-            } break;
-        }
+        state = newState;
     }
 
-    public void render(final Graphics2D g) {
+    private void processInput(final Display.InputHandler input) {
+        states.get(state.value).processInput(input);
+    }
+
+    private void update() {
+        if (isSwitchingState) { // TODO(nschultz): This is it's own state!
+            if (transitionBoxW >= WIDTH && transitionBoxH >= HEIGHT) {
+                isSwitchingState = false;
+            } else {
+                // increment must be 4:3
+                transitionBoxW += 16;
+                transitionBoxH += 12;
+            }
+            return;
+        }
+
+        states.get(state.value).update();
+    }
+
+    private void render(final Graphics2D g) {
         g.setRenderingHints(renderingHints);
 
-        switch (state) {
-            case MENU: {
-                g.setColor(new Color(0, 0, 0));
-                g.fillRect(0, 0, WIDTH, HEIGHT);
-
-                g.setColor(Color.WHITE);
-                g.setFont(mainFont.deriveFont((float) 32));
-                final String str = "untitled";
-                final Dimension dim = calcStringSize(g, str);
-
-                g.drawString(str, (WIDTH / 2) - (dim.width / 2), (HEIGHT / 2) - (dim.height / 2));
-
-                g.setColor(Color.WHITE);
-                g.setFont(mainFont.deriveFont((float) 18));
-                final int len = menuItems.length;
-                for (int i = 0; i < len; ++i) {
-                    String item = menuItems[i];
-                    if (selectedMenuItem == i) {
-                        item = "> " + item + " <";
-                    }
-                    final Dimension itemDim = calcStringSize(g, item);
-                    g.drawString(item, (WIDTH / 2) - (itemDim.width / 2), ((HEIGHT / 2) - (itemDim.height / 2)) + ((i + 1) * 32));
-                }
-            } break;
-
-            case OVER_WORLD: {
-                g.setColor(new Color(10, 50, 10));
-                g.fillRect(0, 0, WIDTH, HEIGHT);
-
-                g.translate(-camera.xCam, -camera.yCam);
-                for (final Entity e : entities) {
-                    if (!camera.isInsideViewPort(e)) {
-                        continue;
-                    }
-                    e.render(g);
-                }
-                player.render(g);
-                g.translate(camera.xCam, camera.yCam);
-            } break;
-
-            default: {
-                assert false : state.name() + " has not been implemented!";
-            } break;
+        if (isSwitchingState) {
+            g.setColor(Color.BLACK);
+            g.fillRect((int) ((WIDTH / 2) - (transitionBoxW / 2)), (int) ((HEIGHT / 2) - (transitionBoxH / 2)), (int) transitionBoxW, (int) transitionBoxH);
+            return;
         }
 
-        // renderTextBox(g, mainFont, Color.WHITE, "HP: 20", new Rectangle(16, 16, 48, 20), Color.BLACK);
-        // final Rectangle centerBox = new Rectangle((WIDTH / 2) - (100 / 2), (HEIGHT / 2) - (100 / 2), 100, 20);
-        // renderTextBox(g, mainFont, Color.WHITE, "> Dark forrest <", centerBox, Color.BLACK);
+        states.get(state.value).render(g);
     }
 
     // TODO(nschultz): I am loading this file over and over and over again.
@@ -386,6 +341,112 @@ public final class Game {
         final String[] lines = end.toString().split("\n");
         for (final String line : lines) {
             g.drawString(line, x, y += strHeight);
+        }
+    }
+
+    private interface GameState {
+        void processInput(final Display.InputHandler input);
+        void update();
+        void render(final Graphics2D g);
+    }
+
+    private final class MenuState implements GameState {
+
+        @Override
+        public void processInput(final Display.InputHandler input) {
+            if (input.isKeyDown(KeyEvent.VK_SPACE)) {
+                if (selectedMenuItem == 0) {
+                    switchState(State.OVER_WORLD);
+                } else {
+                    display.free();
+                }
+            }
+
+            if (input.isKeyDown(KeyEvent.VK_W)) {
+                playSoundFile("res/select.wav", -10f, false);
+                selectedMenuItem = 0;
+            }
+
+            if (input.isKeyDown(KeyEvent.VK_S)) {
+                playSoundFile("res/select.wav", -10f, false);
+                selectedMenuItem = 1;
+            }
+        }
+
+        @Override
+        public void update() {
+        }
+
+        @Override
+        public void render(final Graphics2D g) {
+            g.setColor(new Color(0, 0, 0));
+            g.fillRect(0, 0, WIDTH, HEIGHT);
+
+            g.setColor(Color.WHITE);
+            g.setFont(mainFont.deriveFont((float) 32));
+            final String str = "untitled";
+            final Dimension dim = calcStringSize(g, str);
+
+            g.drawString(str, (WIDTH / 2) - (dim.width / 2), (HEIGHT / 2) - (dim.height / 2));
+
+            g.setColor(Color.WHITE);
+            g.setFont(mainFont.deriveFont((float) 18));
+            final int len = menuItems.length;
+            for (int i = 0; i < len; ++i) {
+                String item = menuItems[i];
+                if (selectedMenuItem == i) {
+                    item = "> " + item + " <";
+                }
+                final Dimension itemDim = calcStringSize(g, item);
+                g.drawString(item, (WIDTH / 2) - (itemDim.width / 2), ((HEIGHT / 2) - (itemDim.height / 2)) + ((i + 1) * 32));
+            }
+        }
+    }
+
+    private final class OverWorldState implements GameState {
+
+        @Override
+        public void processInput(final Display.InputHandler input) {
+            if (input.isKeyPressed(KeyEvent.VK_ESCAPE)) {
+                switchState(State.MENU);
+                return;
+            }
+
+            for (final Entity e : entities) {
+                if (!camera.isInsideViewPort(e)) {
+                    continue;
+                }
+                e.input(input);
+            }
+            player.input(input);
+        }
+
+        @Override
+        public void update() {
+            for (final Entity e : entities) {
+                if (!camera.isInsideViewPort(e)) {
+                    continue;
+                }
+                e.update();
+            }
+            player.update();
+            camera.centerOnEntity(player);
+        }
+
+        @Override
+        public void render(final Graphics2D g) {
+            g.setColor(new Color(10, 50, 10));
+            g.fillRect(0, 0, WIDTH, HEIGHT);
+
+            g.translate(-camera.xCam, -camera.yCam);
+            for (final Entity e : entities) {
+                if (!camera.isInsideViewPort(e)) {
+                    continue;
+                }
+                e.render(g);
+            }
+            player.render(g);
+            g.translate(camera.xCam, camera.yCam);
         }
     }
 

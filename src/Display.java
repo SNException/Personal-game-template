@@ -119,61 +119,11 @@ public final class Display {
         }
     }
 
-    private void input() {
-        game.input(input);
-
-        if (input.isKeyUp(KeyEvent.VK_F11)) {
-            final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-            if (frame.isUndecorated()) {
-                // windowed
-                frame.dispose();
-                frame.setUndecorated(false);
-                canvas.setSize(width * 6, height * 4); // TODO(nschultz): Clamp according to screen resolution
-                frame.pack();
-                frame.setLocationRelativeTo(null);
-                frame.setCursor(Cursor.getDefaultCursor());
-                frame.setVisible(true);
-            } else {
-                // fullscreen
-                frame.dispose();
-                frame.setUndecorated(true);
-                frame.setSize(screenSize.width, screenSize.height);
-                frame.setLocationRelativeTo(null);
-                frame.setCursor(frame.getToolkit().createCustomCursor(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), new Point(), null));
-                frame.setVisible(true);
-            }
-        } else if (input.isKeyUp(KeyEvent.VK_F12)) {
-            switch (debug) {
-                case NONE: {
-                    debug = DebugLevel.MINIMAL;
-                } break;
-
-                case MINIMAL: {
-                    debug = DebugLevel.EXTENDED;
-                } break;
-
-                case EXTENDED: {
-                    debug = DebugLevel.NONE;
-                } break;
-
-                default: {
-                    assert false;
-                }
-            }
-        }
-    }
-
-    private void update() {
-        game.update();
-
-        input.update(); // must be the last call inside this function
-    }
-
-    private void render() {
+    private void nextFrame() {
         // TODO(nschultz): reset graphics object for the game
 
-        // render game code onto the backbuffer
-        game.render(g);
+        game.onNextFrame(g, input);
+        input.update(); // must be called *after* game.nextFrame()
 
         // I use a bufferstrategy so I can render stuff independent of the scaled backbuffer. For example
         // the debug information.
@@ -339,9 +289,7 @@ public final class Display {
 
                 try {
                     EventQueue.invokeAndWait(() -> {
-                        input();
-                        update();
-                        render();
+                        nextFrame();
                         totalFramesRendered += 1;
                     });
                 } catch (final InvocationTargetException ex) {
@@ -349,6 +297,7 @@ public final class Display {
                         final StackTraceElement frame = ex.getCause().getStackTrace()[0];
                         final String message = String.format("assert tripped: %s:%s", frame.getFileName(), frame.getLineNumber());
                         System.err.println(message);
+                        javax.swing.JOptionPane.showMessageDialog(null, message, "assert", javax.swing.JOptionPane.ERROR_MESSAGE);
                         System.exit(-1);
                     } else {
                         ex.printStackTrace(System.err);
@@ -436,6 +385,46 @@ public final class Display {
 
         @Override
         public void keyPressed(final KeyEvent evt) {
+            if (evt.getKeyCode() == KeyEvent.VK_F11) {
+                final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+                if (frame.isUndecorated()) {
+                    // windowed
+                    frame.dispose();
+                    frame.setUndecorated(false);
+                    canvas.setSize(width * 6, height * 4); // TODO(nschultz): Clamp according to screen resolution
+                    frame.pack();
+                    frame.setLocationRelativeTo(null);
+                    frame.setCursor(Cursor.getDefaultCursor());
+                    frame.setVisible(true);
+                } else {
+                    // fullscreen
+                    frame.dispose();
+                    frame.setUndecorated(true);
+                    frame.setSize(screenSize.width, screenSize.height);
+                    frame.setLocationRelativeTo(null);
+                    frame.setCursor(frame.getToolkit().createCustomCursor(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), new Point(), null));
+                    frame.setVisible(true);
+                }
+            } else if (evt.getKeyCode() == KeyEvent.VK_F12) {
+                switch (debug) {
+                    case NONE: {
+                        debug = DebugLevel.MINIMAL;
+                    } break;
+
+                    case MINIMAL: {
+                        debug = DebugLevel.EXTENDED;
+                    } break;
+
+                    case EXTENDED: {
+                        debug = DebugLevel.NONE;
+                    } break;
+
+                    default: {
+                        assert false;
+                    }
+                }
+            }
+
             keys[evt.getKeyCode()] = true;
         }
 
