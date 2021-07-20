@@ -29,23 +29,16 @@ public final class Game {
     private Player player = null;
     private Camera camera = null;
 
-    private boolean isSwitchingState = false;
-    private float transitionBoxW = 0;
-    private float transitionBoxH = 0;
-
     public enum State {
-        MENU(0),
-        OVER_WORLD(1);
-        // TRANSITION; what is the state we transition into?
-
-        public final int value;
-        State(final int value) {
-            this.value = value;
-        }
+        MENU,
+        OVER_WORLD,
+        TRANSITION;
     }
-
     private State state = State.MENU;
-    private ArrayList<GameState> states = null;;
+
+    private GameState menuState = null;
+    private GameState overworldState = null;
+    private GameState transitionState = null;
 
     private int selectedMenuItem = 0;
     private String[] menuItems = new String[] {
@@ -75,9 +68,8 @@ public final class Game {
 
         loadOverworld();
 
-        states = new ArrayList<>(2);
-        states.add(new MenuState());
-        states.add(new OverWorldState());
+        menuState = new MenuState();
+        overworldState = new OverWorldState();
 
         // TODO(nschultz): Play this when it is less obnoxious!
         // playSoundFile("res/retro_bg.wav", 0, true);
@@ -223,42 +215,71 @@ public final class Game {
     private void switchState(final State newState) {
         assert newState != null;
 
-        isSwitchingState = true;
-        transitionBoxW = 0;
-        transitionBoxH = 0;
-
-        state = newState;
+        transitionState = new StateTransitionState(newState);
+        state = State.TRANSITION;
     }
 
     private void processInput(final Display.InputHandler input) {
-        states.get(state.value).processInput(input);
+        switch (state) {
+            case MENU: {
+                menuState.processInput(input);
+            } break;
+
+            case OVER_WORLD: {
+                overworldState.processInput(input);
+            } break;
+
+            case TRANSITION: {
+                transitionState.processInput(input);
+            } break;
+
+            default: {
+                assert false;
+            } break;
+        }
     }
 
     private void update() {
-        if (isSwitchingState) { // TODO(nschultz): This is it's own state!
-            if (transitionBoxW >= WIDTH && transitionBoxH >= HEIGHT) {
-                isSwitchingState = false;
-            } else {
-                // increment must be 4:3
-                transitionBoxW += 16;
-                transitionBoxH += 12;
-            }
-            return;
-        }
 
-        states.get(state.value).update();
+        switch (state) {
+            case MENU: {
+                menuState.update();
+            } break;
+
+            case OVER_WORLD: {
+                overworldState.update();
+            } break;
+
+            case TRANSITION: {
+                transitionState.update();
+            } break;
+
+            default: {
+                assert false;
+            } break;
+        }
     }
 
     private void render(final Graphics2D g) {
         g.setRenderingHints(renderingHints);
 
-        if (isSwitchingState) {
-            g.setColor(Color.BLACK);
-            g.fillRect((int) ((WIDTH / 2) - (transitionBoxW / 2)), (int) ((HEIGHT / 2) - (transitionBoxH / 2)), (int) transitionBoxW, (int) transitionBoxH);
-            return;
-        }
+        switch (state) {
+            case MENU: {
+                menuState.render(g);
+            } break;
 
-        states.get(state.value).render(g);
+            case OVER_WORLD: {
+                overworldState.render(g);
+            } break;
+
+            case TRANSITION: {
+                transitionState.render(g);
+            } break;
+
+            default: {
+                assert false;
+            } break;
+        }
     }
 
     // TODO(nschultz): I am loading this file over and over and over again.
@@ -447,6 +468,42 @@ public final class Game {
             }
             player.render(g);
             g.translate(camera.xCam, camera.yCam);
+        }
+    }
+
+    private final class StateTransitionState implements GameState {
+
+        private final State newState;
+
+        private float transitionBoxW = 0;
+        private float transitionBoxH = 0;
+
+        public StateTransitionState(final State newState) {
+            assert newState != null;
+            this.newState = newState;
+        }
+
+        @Override
+        public void processInput(final Display.InputHandler input) {
+            // we do not process any input in this state
+        }
+
+        @Override
+        public void update() {
+            if (transitionBoxW >= WIDTH && transitionBoxH >= HEIGHT) {
+                state = newState;
+            } else {
+                // increment must be 4:3
+                transitionBoxW += 16;
+                transitionBoxH += 12;
+            }
+            return;
+        }
+
+        @Override
+        public void render(final Graphics2D g) {
+            g.setColor(Color.BLACK);
+            g.fillRect((int) ((WIDTH / 2) - (transitionBoxW / 2)), (int) ((HEIGHT / 2) - (transitionBoxH / 2)), (int) transitionBoxW, (int) transitionBoxH);
         }
     }
 
